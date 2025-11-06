@@ -1,33 +1,50 @@
-import { useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
-import DoctorDashboard from './DoctorDashboard'
-import PatientDashboard from './PatientDashboard'
+import { useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import DoctorDashboard from "./DoctorDashboard";
+import PatientDashboard from "./PatientDashboard";
 
 export default function Dashboard() {
-  const { userProfile, loading } = useAuth()
-  const navigate = useNavigate()
+  const { user, userProfile, loading } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !userProfile) {
-      navigate('/login')
-    } else if (!loading && userProfile && !userProfile.profile) {
-      navigate(`/profile-setup?role=${userProfile.role}`)
+    if (!loading) {
+      if (!user || !userProfile) {
+        console.log("No user or profile, redirecting to login");
+        navigate("/login");
+      } else if (userProfile && !userProfile.profile) {
+        console.log("No profile found, redirecting to profile-setup");
+        navigate(`/profile-setup?role=${userProfile.role}`);
+      }
     }
-  }, [userProfile, loading, navigate])
+  }, [user, userProfile, loading, navigate]);
 
   if (loading) {
-    return <div className="dashboard-container">Loading...</div>
+    return (
+      <div
+        className="dashboard-container"
+        style={{ padding: "50px", textAlign: "center" }}
+      >
+        <p>Loading...</p>
+        <p style={{ fontSize: "14px", color: "#666" }}>
+          Please wait while we fetch your data
+        </p>
+      </div>
+    );
   }
 
-  if (!userProfile) {
-    return null
+  if (!user || !userProfile) {
+    return null;
   }
 
   if (!userProfile.profile) {
-    return null
+    return null;
   }
 
-  return userProfile.role === 'doctor' ? <DoctorDashboard /> : <PatientDashboard />
+  return userProfile.role === "doctor" ? (
+    <DoctorDashboard />
+  ) : (
+    <PatientDashboard />
+  );
 }
-
