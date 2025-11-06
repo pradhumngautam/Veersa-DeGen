@@ -9,14 +9,20 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Only redirect if loading is complete AND we don't have user/profile
     if (!loading) {
-      if (!user || !userProfile) {
-        console.log("No user or profile, redirecting to login");
-        navigate("/login");
-      } else if (userProfile && !userProfile.profile) {
-        console.log("No profile found, redirecting to profile-setup");
-        navigate(`/profile-setup?role=${userProfile.role}`);
-      }
+      // Give a small delay to ensure state is stable
+      const timer = setTimeout(() => {
+        if (!user || !userProfile) {
+          console.log("No user or profile, redirecting to login");
+          navigate("/login");
+        } else if (userProfile && !userProfile.profile) {
+          console.log("No profile found, redirecting to profile-setup");
+          navigate(`/profile-setup?role=${userProfile.role}`);
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
     }
   }, [user, userProfile, loading, navigate]);
 

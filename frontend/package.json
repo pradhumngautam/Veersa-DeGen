@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@square/web-sdk": "^2.1.0",
     "@supabase/supabase-js": "^2.80.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.5"
   },
   "devDependencies": {

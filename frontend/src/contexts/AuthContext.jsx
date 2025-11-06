@@ -32,15 +32,16 @@ export const AuthProvider = ({ children }) => {
   }, [userProfile]);
 
   const fetchUserProfile = useCallback(async (userId, forceRefresh = false) => {
-    // Prevent duplicate fetches
-    if (fetchingRef.current && !forceRefresh) {
-      console.log("Profile fetch already in progress, skipping...");
-      return;
-    }
-
     // If we already have profile for this user, don't fetch again unless forced
     if (userProfileRef.current?.id === userId && !forceRefresh) {
       console.log("Profile already loaded for user:", userId);
+      setLoading(false);
+      return;
+    }
+
+    // Prevent duplicate fetches
+    if (fetchingRef.current && !forceRefresh) {
+      console.log("Profile fetch already in progress, skipping...");
       return;
     }
 
@@ -48,28 +49,61 @@ export const AuthProvider = ({ children }) => {
       fetchingRef.current = true;
       setLoading(true);
       console.log("Fetching profile for user:", userId);
+      console.log("Supabase client:", !!supabase);
 
       // Small delay to ensure session is ready (especially after token refresh)
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      // Fetch user role with timeout protection
-      const userQueryPromise = supabase
+      // Fetch user role - execute query with timeout
+      console.log("Executing user query...");
+      console.log("Supabase URL:", supabase.supabaseUrl);
+      console.log("User ID:", userId);
+
+      const queryStartTime = Date.now();
+
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Query timeout after 10 seconds")),
+          10000
+        )
+      );
+
+      // Race between query and timeout
+      const queryPromise = supabase
         .from("users")
         .select("*")
         .eq("id", userId)
         .single();
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Query timeout")), 15000)
-      );
+      console.log("Query promise created, awaiting...");
 
-      const { data: userData, error: userError } = await Promise.race([
-        userQueryPromise,
-        timeoutPromise,
-      ]).catch((error) => {
-        console.error("User query failed:", error);
-        return { data: null, error };
-      });
+      let userData, userError;
+      try {
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+        userData = result.data;
+        userError = result.error;
+        const queryTime = Date.now() - queryStartTime;
+        console.log(`User query completed in ${queryTime}ms`, {
+          hasData: !!userData,
+          hasError: !!userError,
+          error: userError,
+        });
+      } catch (err) {
+        console.error("Query failed or timed out:", err);
+        console.error("Error details:", err.message, err.stack);
+        userError = err;
+        userData = null;
+        // If we have a cached profile, use it instead of failing
+        if (userProfileRef.current?.id === userId) {
+          console.log("Using cached profile due to query timeout");
+          setLoading(false);
+          fetchingRef.current = false;
+          return;
+        }
+        // Reset fetching ref so we can retry only if no cached profile
+        fetchingRef.current = false;
+      }
 
       if (userError) {
         console.error("Error fetching user:", userError);
@@ -84,7 +118,7 @@ export const AuthProvider = ({ children }) => {
       if (!userData) {
         console.log("No user data found");
         // Don't clear existing profile - keep what we have
-        if (!userProfile) {
+        if (!userProfileRef.current) {
           setUserProfile(null);
         }
         setLoading(false);
@@ -101,17 +135,9 @@ export const AuthProvider = ({ children }) => {
           .eq("user_id", userId)
           .maybeSingle();
 
-        const profileTimeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Profile query timeout")), 15000)
-        );
-
-        const { data: doctorProfile, error: doctorError } = await Promise.race([
-          profileQueryPromise,
-          profileTimeoutPromise,
-        ]).catch((error) => {
-          console.error("Doctor profile query failed:", error);
-          return { data: null, error };
-        });
+        // No timeout for profile queries - let them complete naturally
+        const { data: doctorProfile, error: doctorError } =
+          await profileQueryPromise;
 
         if (doctorError && doctorError.code !== "PGRST116") {
           console.error("Error fetching doctor profile:", doctorError);
@@ -124,18 +150,9 @@ export const AuthProvider = ({ children }) => {
           .eq("user_id", userId)
           .maybeSingle();
 
-        const profileTimeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Profile query timeout")), 15000)
-        );
-
+        // No timeout for profile queries - let them complete naturally
         const { data: patientProfile, error: patientError } =
-          await Promise.race([
-            profileQueryPromise,
-            profileTimeoutPromise,
-          ]).catch((error) => {
-            console.error("Patient profile query failed:", error);
-            return { data: null, error };
-          });
+          await profileQueryPromise;
 
         if (patientError && patientError.code !== "PGRST116") {
           console.error("Error fetching patient profile:", patientError);
@@ -153,7 +170,6 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       console.log("Profile fetch complete, loading set to false");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -184,33 +200,70 @@ export const AuthProvider = ({ children }) => {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
-      console.log("Auth state changed:", event, session?.user?.id || "No user");
-
       // Ignore TOKEN_REFRESHED events - they don't need profile refetch
       if (event === "TOKEN_REFRESHED") {
-        console.log("Token refreshed, keeping existing profile");
+        // Silent - token refresh is normal and doesn't need action
         return;
+      }
+
+      // Ignore duplicate SIGNED_IN events if we already have the profile
+      // This happens when Supabase refreshes tokens or recovers sessions
+      if (
+        event === "SIGNED_IN" &&
+        userProfileRef.current?.id === session?.user?.id
+      ) {
+        // Silent - duplicate SIGNED_IN events are normal (token refresh, session recovery)
+        setUser(session?.user ?? null);
+        setLoading(false);
+        return;
+      }
+
+      // Only log important auth state changes
+      if (event !== "SIGNED_IN" || !userProfileRef.current) {
+        console.log(
+          "Auth state changed:",
+          event,
+          session?.user?.id || "No user"
+        );
       }
 
       setUser(session?.user ?? null);
       if (session?.user) {
-        // Always fetch profile on SIGNED_IN event (initial sign-in)
-        // But skip if it's a token refresh for same user
-        if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-          await fetchUserProfile(session.user.id);
-        } else {
-          // For other events, check if we need to fetch
-          const currentProfile = userProfileRef.current;
-          if (!currentProfile || currentProfile.id !== session.user.id) {
-            await fetchUserProfile(session.user.id);
+        const currentProfile = userProfileRef.current;
+        const userId = session.user.id;
+
+        // Check if we already have the profile for this user
+        if (currentProfile && currentProfile.id === userId) {
+          console.log("Profile already loaded for user, skipping fetch");
+          setLoading(false);
+          return;
+        }
+
+        // Only fetch if we don't have the profile or if it's a different user
+        if (!currentProfile || currentProfile.id !== userId) {
+          // Only reset fetchingRef if it's been stuck (not currently fetching)
+          if (
+            !fetchingRef.current ||
+            event === "SIGNED_IN" ||
+            event === "INITIAL_SESSION"
+          ) {
+            fetchingRef.current = false; // Reset in case previous fetch hung
+            await fetchUserProfile(
+              userId,
+              event === "SIGNED_IN" || event === "INITIAL_SESSION"
+            );
           } else {
-            console.log("User ID unchanged, profile already loaded");
+            console.log("Fetch already in progress, skipping duplicate event");
             setLoading(false);
           }
+        } else {
+          console.log("User ID unchanged, profile already loaded");
+          setLoading(false);
         }
       } else {
         // Only clear profile on actual sign out
         if (event === "SIGNED_OUT") {
+          fetchingRef.current = false;
           setUserProfile(null);
         }
         setLoading(false);
