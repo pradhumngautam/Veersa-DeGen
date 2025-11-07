@@ -12,6 +12,7 @@
   "dependencies": {
     "@square/web-sdk": "^2.1.0",
     "@supabase/supabase-js": "^2.80.0",
+    "event-source-polyfill": "^1.0.31",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hot-toast": "^2.6.0",

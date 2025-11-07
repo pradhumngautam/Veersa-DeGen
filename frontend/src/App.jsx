@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ProfileSetup from './pages/ProfileSetup'
 import Dashboard from './pages/Dashboard'
+import MedicalRecords from './pages/MedicalRecords' 
+import PatientChat from './pages/PatientChat'
 import './App.css'
 
 function ProtectedRoute({ children }) {
@@ -38,7 +40,25 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* Add MedicalRecords as its own separate route */}
+        <Route
+          path="/medical-records"
+          element={
+            <ProtectedRoute>
+              <MedicalRecords />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/" element={<Navigate to="/dashboard" />} />
+
+        <Route
+          path="/patient-chat"
+          element={
+            <ProtectedRoute>
+              <PatientChat />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   )
