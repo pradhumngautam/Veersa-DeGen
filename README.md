@@ -19,44 +19,44 @@
 
 ### Login & SignUp
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/db453287-cb65-4956-8e83-235ccdb9f6bb" width="45%" />
-   <img src="https://github.com/user-attachments/assets/eea7aa3d-76a0-4407-839e-e59b164f2aea" width="45%" />
+  <img src="./Images/1.png" width="45%" />
+   <img src="./Images/2.png" width="45%" />
 </p>
 
 ### Patient Dashboard
 
-<img width="1431" height="808" alt="Patient_dashboard" src="https://github.com/user-attachments/assets/ebfd6e06-b921-4967-8fdd-b330f1a8367d" />
+<img width="1431" height="808" alt="Patient_dashboard" src="./Images/3.png" />
 
 ### Book Appointments & Payment 
 
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/3acb7486-83d1-4491-95d3-96225da71adc" width="33%" />
-  <img src="https://github.com/user-attachments/assets/1bcb63fb-802e-4273-b324-47c0f78e103c" width="33%" />
-  <img src="https://github.com/user-attachments/assets/35ea097d-9ca2-464a-9929-fca3b80619a4" width="33%" height="380px" />
+  <img src="./Images/4.png" width="33%" />
+  <img src="./Images/5.png" width="33%" />
+  <img src="./Images/6.png" width="33%" height="420px" />
 </p>
 
 ### Dashboard Updated
 
-<img width="1428" height="801" alt="Dashboard_patient" src="https://github.com/user-attachments/assets/83b326b6-2883-421f-ba10-3ca7a3e3cae4" />
+<img width="1428" height="801" alt="Dashboard_patient" src="./Images/7.png" />
 
 ### Medical Reports
 
-<img width="990" height="518" alt="Medical_Reports" src="https://github.com/user-attachments/assets/e2db0136-ccaf-4ceb-ba72-af5ede0d5029" />
+<img width="990" height="518" alt="Medical_Reports" src="./Images/8.png" />
 
 ### AI Chat Assistant
 
-<img width="1152" height="658" alt="AI_chat_assitant" src="https://github.com/user-attachments/assets/1e030db1-5a82-45c7-9d4b-b0d89b572405" />
+<img width="1152" height="658" alt="AI_chat_assitant" src="./Images/9.png" />
 
 ### Doctors Dashboard
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1ea1dba1-0204-4ea0-9042-6cd93b918b58" width="45%" height="250px" />
-  <img src="https://github.com/user-attachments/assets/41bce5ad-85ae-40a8-9797-e14e8bc135cf" width="45%" height="250px" />
+  <img src="./Images/10.png" width="45%" height="250px" />
+  <img src="./Images/11.png" width="45%" height="250px" />
 </p> 
 
 ### Video Call 
 
-<img width="541" height="534" alt="Video_call_demo" src="https://github.com/user-attachments/assets/6f82a688-712e-43fb-8a67-5bf97eaf3056" />
+<img width="541" height="534" alt="Video_call_demo" src="./Images/12.png" />
 
 
 ## 🛠️ Tech Stack
