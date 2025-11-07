@@ -99,10 +99,29 @@ export default function PaymentPage({
   };
 
   return (
-    <div className="payment-modal">
+    <div className="payment-modal" onClick={(e) => {
+      if (e.target === e.currentTarget) {
+        onCancel();
+      }
+    }}>
       <div className="payment-card">
-        <h2>Complete Payment</h2>
-        <p className="payment-amount">Amount: ${amount.toFixed(2)}</p>
+        <div className="payment-header">
+          <h2>Complete Payment</h2>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="payment-close-btn"
+            aria-label="Close"
+            disabled={loading}
+          >
+            ×
+          </button>
+        </div>
+        
+        <div className="payment-amount-section">
+          <span className="amount-label">Total Amount</span>
+          <span className="amount-value">${amount.toFixed(2)}</span>
+        </div>
 
         <form onSubmit={handlePayment}>
           <div className="form-group">
@@ -114,6 +133,7 @@ export default function PaymentPage({
               placeholder="4111 1111 1111 1111"
               maxLength="19"
               required
+              disabled={loading}
             />
           </div>
 
@@ -127,6 +147,7 @@ export default function PaymentPage({
                 placeholder="12/25"
                 maxLength="5"
                 required
+                disabled={loading}
               />
             </div>
             <div className="form-group">
@@ -140,6 +161,7 @@ export default function PaymentPage({
                 placeholder="123"
                 maxLength="4"
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -155,29 +177,38 @@ export default function PaymentPage({
               placeholder="12345"
               maxLength="5"
               required
+              disabled={loading}
             />
           </div>
 
           <div className="test-card-info">
-            <strong>Test Mode:</strong> Use card number starting with 4 (e.g.,
-            4111 1111 1111 1111)
-            <br />
-            Any expiry date, CVV, and ZIP code will work.
+            <div className="test-info-icon">ℹ️</div>
+            <div className="test-info-content">
+              <strong>Test Mode</strong>
+              <p>Use card number starting with 4 (e.g., 4111 1111 1111 1111). Any expiry date, CVV, and ZIP code will work.</p>
+            </div>
           </div>
 
           {error && <div className="error-message">{error}</div>}
 
           <div className="form-actions">
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? "Processing..." : `Pay $${amount.toFixed(2)}`}
-            </button>
             <button
               type="button"
               onClick={onCancel}
-              className="btn-secondary"
+              className="btn-cancel"
               disabled={loading}
             >
               Cancel
+            </button>
+            <button type="submit" disabled={loading} className="btn-pay">
+              {loading ? (
+                <>
+                  <span className="spinner"></span>
+                  Processing...
+                </>
+              ) : (
+                `Pay $${amount.toFixed(2)}`
+              )}
             </button>
           </div>
         </form>

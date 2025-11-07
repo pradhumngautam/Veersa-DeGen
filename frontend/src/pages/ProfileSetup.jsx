@@ -37,11 +37,33 @@ export default function ProfileSetup() {
   useEffect(() => {
     if (!user) {
       navigate('/login')
+      return
     }
+    
+    // Load existing profile data if editing
     if (userProfile?.profile) {
-      navigate('/dashboard')
+      const profile = userProfile.profile
+      setFormData({
+        first_name: profile.first_name || '',
+        last_name: profile.last_name || '',
+        age: profile.age?.toString() || '',
+        ...(role === 'doctor' ? {
+          experience_years: profile.experience_years?.toString() || '',
+          degree: Array.isArray(profile.degree) ? profile.degree.join(', ') : (profile.degree || ''),
+          specialization: Array.isArray(profile.specialization) ? profile.specialization.join(', ') : (profile.specialization || ''),
+          bio: profile.bio || '',
+          consultation_price: profile.consultation_price?.toString() || '',
+          available_slots: Array.isArray(profile.available_slots) ? profile.available_slots : [],
+        } : {
+          weight: profile.weight?.toString() || '',
+          height: profile.height?.toString() || '',
+          blood_group: profile.blood_group || '',
+          medical_history: profile.medical_history || '',
+          allergies: Array.isArray(profile.allergies) ? profile.allergies : [],
+        }),
+      })
     }
-  }, [user, userProfile, navigate])
+  }, [user, userProfile, navigate, role])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -97,7 +119,7 @@ export default function ProfileSetup() {
     }
 
     if (!user || !user.id) {
-      setError('You must be logged in to create a profile')
+      setError('You must be logged in to update your profile')
       return
     }
 
@@ -105,7 +127,6 @@ export default function ProfileSetup() {
 
     try {
       const profileData = {
-        user_id: user.id,
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
         age: parseInt(formData.age),
@@ -132,20 +153,37 @@ export default function ProfileSetup() {
       }
 
       const tableName = role === 'doctor' ? 'doctor_profiles' : 'patient_profiles'
+      const profileId = userProfile?.profile?.id
       
-      console.log('Submitting profile data:', { tableName, profileData })
-      
-      const { data, error: insertError } = await supabase
-        .from(tableName)
-        .insert([profileData])
-        .select()
+      let result
+      if (profileId) {
+        // Update existing profile
+        const { data, error: updateError } = await supabase
+          .from(tableName)
+          .update(profileData)
+          .eq('id', profileId)
+          .select()
 
-      if (insertError) {
-        console.error('Insert error:', insertError)
-        throw insertError
+        if (updateError) {
+          console.error('Update error:', updateError)
+          throw updateError
+        }
+        result = data
+      } else {
+        // Create new profile
+        const { data, error: insertError } = await supabase
+          .from(tableName)
+          .insert([{ user_id: user.id, ...profileData }])
+          .select()
+
+        if (insertError) {
+          console.error('Insert error:', insertError)
+          throw insertError
+        }
+        result = data
       }
 
-      console.log('Profile created successfully:', data)
+      console.log('Profile saved successfully:', result)
 
       // Refresh user profile
       await fetchUserProfile(user.id)
@@ -153,8 +191,8 @@ export default function ProfileSetup() {
       // Navigate to dashboard
       navigate('/dashboard')
     } catch (err) {
-      console.error('Error creating profile:', err)
-      setError(err.message || 'Failed to create profile. Please try again.')
+      console.error('Error saving profile:', err)
+      setError(err.message || 'Failed to save profile. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -163,7 +201,7 @@ export default function ProfileSetup() {
   return (
     <div className="profile-setup-container">
       <div className="profile-setup-card">
-        <h2>Complete Your {role === 'doctor' ? 'Doctor' : 'Patient'} Profile</h2>
+        <h2>{userProfile?.profile ? 'Edit Your' : 'Complete Your'} {role === 'doctor' ? 'Doctor' : 'Patient'} Profile</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <div className="form-group">
@@ -362,7 +400,7 @@ export default function ProfileSetup() {
 
           {error && <div className="error-message">{error}</div>}
           <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? 'Saving...' : 'Complete Profile'}
+            {loading ? 'Saving...' : userProfile?.profile ? 'Update Profile' : 'Complete Profile'}
           </button>
         </form>
       </div>

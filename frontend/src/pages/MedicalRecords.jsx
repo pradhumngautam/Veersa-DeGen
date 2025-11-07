@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import './Dashboard.css'; // Re-using dashboard styles for consistency
+import React, { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
+import Layout from "../components/Layout";
+import "./Dashboard.css";
 
 export default function MedicalRecords() {
   const { user, userProfile } = useAuth();
@@ -27,15 +28,15 @@ export default function MedicalRecords() {
       if (!patientProfileId) return; // Guard clause
 
       const { data, error } = await supabase
-        .from('medical_documents')
-        .select('*')
-        .eq('patient_id', patientProfileId) // <-- CORRECTED
-        .order('created_at', { ascending: false });
+        .from("medical_documents")
+        .select("*")
+        .eq("patient_id", patientProfileId) // <-- CORRECTED
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setDocuments(data || []);
     } catch (error) {
-      console.error('Error fetching documents:', error.message);
+      console.error("Error fetching documents:", error.message);
     } finally {
       setLoading(false);
     }
@@ -44,7 +45,9 @@ export default function MedicalRecords() {
   async function handleFileUpload(event) {
     // Critical check: Ensure we have the user and their profile ID
     if (!patientProfileId || !user?.id) {
-      alert('Error: Profile is not fully loaded. Please refresh and try again.');
+      alert(
+        "Error: Profile is not fully loaded. Please refresh and try again."
+      );
       return;
     }
 
@@ -54,27 +57,27 @@ export default function MedicalRecords() {
       if (!file) return;
 
       // 1. Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`; // Uses auth user ID for folder
       const filePath = fileName;
 
       const { error: uploadError } = await supabase.storage
-        .from('patient_records')
+        .from("patient_records")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       // 2. Insert record into database
       const { data: docData, error: dbError } = await supabase
-        .from('medical_documents')
+        .from("medical_documents")
         .insert([
           {
             patient_id: patientProfileId, // <-- CORRECTED
             file_name: file.name,
             file_url: filePath,
             document_type: file.type,
-            processing_status: 'pending'
-          }
+            processing_status: "pending",
+          },
         ])
         .select()
         .single();
@@ -82,21 +85,22 @@ export default function MedicalRecords() {
       if (dbError) throw dbError;
 
       // 3. Trigger the Edge Function
-      console.log('⚡ triggering process-document for:', docData.id);
-      supabase.functions.invoke('process-document', {
-        body: { document_id: docData.id }
-      }).then(({ data, error }) => {
-          if (error) console.error('Edge function error:', error);
-          else console.log('Edge function response:', data);
+      console.log("⚡ triggering process-document for:", docData.id);
+      supabase.functions
+        .invoke("process-document", {
+          body: { document_id: docData.id },
+        })
+        .then(({ data, error }) => {
+          if (error) console.error("Edge function error:", error);
+          else console.log("Edge function response:", data);
           fetchDocuments(); // Refresh list
-      });
+        });
 
       // Refresh immediately to show the new 'pending' document
       fetchDocuments();
-
     } catch (error) {
-      console.error('Error during upload:', error);
-      alert('Error uploading file: ' + error.message);
+      console.error("Error during upload:", error);
+      alert("Error uploading file: " + error.message);
     } finally {
       setUploading(false);
     }
@@ -129,7 +133,9 @@ export default function MedicalRecords() {
               <td>{new Date(doc.created_at).toLocaleDateString()}</td>
               <td>{doc.file_name}</td>
               <td>
-                <span className={`status-badge status-${doc.processing_status}`}>
+                <span
+                  className={`status-badge status-${doc.processing_status}`}
+                >
                   {doc.processing_status}
                 </span>
               </td>
@@ -141,33 +147,23 @@ export default function MedicalRecords() {
   };
 
   return (
-    <div className="dashboard-container">
-      <aside className="dashboard-sidebar">
-        {/* ... your sidebar nav ... */}
-        <nav className="sidebar-nav">
-          <a href="/dashboard">Dashboard</a>
-          <a href="/medical-records" className="active">Medical Records</a>
-          <a href="/patient-chat">AI Assistant</a>
-        </nav>
-      </aside>
-
-      <main className="dashboard-main">
-        <header className="dashboard-header">
-          <h1>My Medical Records</h1>
-        </header>
-
+    <Layout>
+      <div className="dashboard-wrapper">
         <div className="dashboard-content">
           {/* Upload Section */}
           <div className="card">
-             <h3>Upload New Record</h3>
-             <p>Upload your medical reports (PDF, JPG, PNG) for AI analysis.</p>
-             <input
-               type="file"
-               accept=".pdf,image/png,image/jpeg"
-               onChange={handleFileUpload}
-               disabled={uploading || loading || !patientProfileId} // Disable if not ready
-             />
-             {uploading && <p>Uploading... please wait.</p>}
+            <h3>Upload New Record</h3>
+            <p>Upload your medical reports (PDF, JPG, PNG) for AI analysis.</p>
+            <input
+              type="file"
+              accept=".pdf,image/png,image/jpeg"
+              onChange={handleFileUpload}
+              disabled={uploading || loading || !patientProfileId}
+              className="file-upload-input"
+            />
+            {uploading && (
+              <p className="upload-status">Uploading... please wait.</p>
+            )}
           </div>
 
           {/* Document List */}
@@ -176,7 +172,7 @@ export default function MedicalRecords() {
             {renderContent()}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 }

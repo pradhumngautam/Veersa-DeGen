@@ -481,6 +481,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import PaymentPage from "./PaymentPage";
 import VideoCall from "./VideoCall";
+import Layout from "../components/Layout";
 import toast from "react-hot-toast";
 import "./Dashboard.css";
 
@@ -496,6 +497,7 @@ export default function PatientDashboard() {
   const [filter, setFilter] = useState("upcoming");
   const [activeCall, setActiveCall] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedAppointments, setExpandedAppointments] = useState(new Set());
 
   const [bookingData, setBookingData] = useState({
     doctor_id: "",
@@ -715,23 +717,39 @@ export default function PatientDashboard() {
     const tenMinutesBefore = new Date(appointmentDate.getTime() - 10 * 60000);
     const oneHourAfter = new Date(appointmentDate.getTime() + 60 * 60000);
     
+    // Allow joining if appointment is confirmed (within call window)
     return now >= tenMinutesBefore && 
            now <= oneHourAfter && 
-           appointment.status === 'confirmed' &&
-           appointment.payment_status === 'paid';
+           appointment.status === 'confirmed';
   };
 
   const startVideoCall = (appointment) => {
     setActiveCall(appointment);
   };
 
+  const toggleAppointmentDetails = (appointmentId) => {
+    setExpandedAppointments((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(appointmentId)) {
+        newSet.delete(appointmentId);
+      } else {
+        newSet.add(appointmentId);
+      }
+      return newSet;
+    });
+  };
+
   const filteredAppointments = appointments.filter((apt) => {
-    const today = new Date();
+    const now = new Date();
     const aptDate = new Date(apt.appointment_date);
-    const isPast =
-      aptDate < today ||
-      (aptDate.toDateString() === today.toDateString() &&
-        apt.appointment_time < new Date().toTimeString().slice(0, 5));
+    
+    // Create a proper date-time object for the appointment
+    const [hours, minutes] = apt.appointment_time.split(':');
+    const appointmentDateTime = new Date(aptDate);
+    appointmentDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+    
+    // Check if appointment is in the past
+    const isPast = appointmentDateTime < now;
 
     if (filter === "upcoming")
       return (
@@ -765,40 +783,34 @@ export default function PatientDashboard() {
 
   if (loading && appointments.length === 0) {
     return (
-      <div className="dashboard-container">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading your dashboard...</p>
+      <Layout>
+        <div className="dashboard-wrapper">
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Loading your dashboard...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <div>
-          <h1>Patient Dashboard</h1>
-          <p>
-            Welcome, {userProfile?.profile?.first_name}{" "}
-            {userProfile?.profile?.last_name}
-          </p>
+    <Layout showEditProfile={true}>
+      <div className="dashboard-wrapper">
+        <div className="dashboard-header">
+          <div className="welcome-section">
+            <h1>Welcome back, {userProfile?.profile?.first_name}!</h1>
+            <p>
+              Manage your appointments and health records
+            </p>
+          </div>
+          <div className="header-actions">
+            <button onClick={() => setShowBooking(true)} className="btn-book-appointment">
+              <span className="btn-icon">+</span>
+              <span>Book Appointment</span>
+            </button>
+          </div>
         </div>
-        <div className="header-actions">
-          <button onClick={() => setShowBooking(true)} className="btn-primary">
-            Book Appointment
-          </button>
-          <button
-            onClick={() => navigate("/profile-setup?role=patient")}
-            className="btn-secondary"
-          >
-            Edit Profile
-          </button>
-          <button onClick={signOut} className="btn-secondary">
-            Sign Out
-          </button>
-        </div>
-      </div>
 
       {showBooking && (
         <div className="booking-modal" onClick={(e) => {
@@ -1006,72 +1018,117 @@ export default function PatientDashboard() {
         {filteredAppointments.length === 0 ? (
           <p className="no-data">No appointments found</p>
         ) : (
-          filteredAppointments.map((appointment) => (
-            <div key={appointment.id} className="appointment-card">
-              <div className="appointment-info">
-                <h3>
-                  Dr. {appointment.doctor_profiles?.first_name}{" "}
-                  {appointment.doctor_profiles?.last_name}
-                </h3>
-                <p>
-                  <strong>Specialization:</strong>{" "}
-                  {appointment.doctor_profiles?.specialization?.join(", ")}
-                </p>
-                <p>
-                  <strong>Date:</strong>{" "}
-                  {formatDate(appointment.appointment_date)}
-                </p>
-                <p>
-                  <strong>Time:</strong> {appointment.appointment_time}
-                </p>
-                <p>
-                  <strong>Status:</strong>{" "}
-                  <span className={`status-badge status-${appointment.status}`}>
-                    {appointment.status}
-                  </span>
-                </p>
-                <p>
-                  <strong>Payment:</strong>{" "}
-                  <span
-                    className={`status-badge status-${appointment.payment_status}`}
-                  >
-                    {appointment.payment_status}
-                  </span>
-                </p>
-                <p>
-                  <strong>Amount:</strong> ${appointment.payment_amount}
-                </p>
-                {appointment.patient_notes && (
-                  <p>
-                    <strong>Notes:</strong> {appointment.patient_notes}
-                  </p>
-                )}
-              </div>
-              <div className="appointment-actions">
-                {appointment.payment_status === "pending" &&
-                  appointment.status === "pending" && (
+          filteredAppointments.map((appointment) => {
+            const isExpanded = expandedAppointments.has(appointment.id);
+            return (
+              <div key={appointment.id} className={`appointment-card ${isExpanded ? 'expanded' : ''}`}>
+                <div className="appointment-card-header">
+                  <div className="appointment-main-info">
+                    <div className="doctor-info">
+                      <h3>
+                        Dr. {appointment.doctor_profiles?.first_name}{" "}
+                        {appointment.doctor_profiles?.last_name}
+                      </h3>
+                      <p className="specialization">
+                        {appointment.doctor_profiles?.specialization?.join(", ")}
+                      </p>
+                    </div>
+                    <div className="appointment-meta">
+                      <div className="meta-item">
+                        <span className="meta-label">Date</span>
+                        <span className="meta-value">
+                          {new Date(appointment.appointment_date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </div>
+                      <div className="meta-item">
+                        <span className="meta-label">Time</span>
+                        <span className="meta-value">{appointment.appointment_time}</span>
+                      </div>
+                      <div className="meta-item">
+                        <span className="meta-label">Status</span>
+                        <span className={`status-badge status-${appointment.status}`}>
+                          {appointment.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="appointment-header-actions">
                     <button
-                      onClick={() => {
-                        setSelectedAppointment(appointment);
-                        setShowPayment(true);
-                      }}
-                      className="btn-primary"
+                      onClick={() => toggleAppointmentDetails(appointment.id)}
+                      className="btn-view-details"
                     >
-                      Pay Now (${appointment.payment_amount})
+                      {isExpanded ? (
+                        <>
+                          <span>Hide Details</span>
+                          <span className="icon">▲</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>View Details</span>
+                          <span className="icon">▼</span>
+                        </>
+                      )}
                     </button>
-                  )}
-                {canJoinCall(appointment) && (
-                  <button
-                    onClick={() => startVideoCall(appointment)}
-                    className="btn-success"
-                    style={{ background: '#28a745' }}
-                  >
-                    📹 Join Video Call
-                  </button>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="appointment-details">
+                    <div className="details-grid">
+                      <div className="detail-item">
+                        <span className="detail-label">Full Date</span>
+                        <span className="detail-value">
+                          {formatDate(appointment.appointment_date)}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Payment Status</span>
+                        <span className={`status-badge status-${appointment.payment_status}`}>
+                          {appointment.payment_status}
+                        </span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Amount</span>
+                        <span className="detail-value">${appointment.payment_amount}</span>
+                      </div>
+                      {appointment.patient_notes && (
+                        <div className="detail-item full-width">
+                          <span className="detail-label">Notes</span>
+                          <span className="detail-value">{appointment.patient_notes}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="appointment-actions">
+                      {appointment.payment_status === "pending" &&
+                        appointment.status === "pending" && (
+                          <button
+                            onClick={() => {
+                              setSelectedAppointment(appointment);
+                              setShowPayment(true);
+                            }}
+                            className="btn-pay-now"
+                          >
+                            Pay Now (${appointment.payment_amount})
+                          </button>
+                        )}
+                      {canJoinCall(appointment) && (
+                        <button
+                          onClick={() => startVideoCall(appointment)}
+                          className="btn-join-call"
+                        >
+                          📹 Join Video Call
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -1090,6 +1147,7 @@ export default function PatientDashboard() {
           }}
         />
       )}
-    </div>
+      </div>
+    </Layout>
   );
 }
