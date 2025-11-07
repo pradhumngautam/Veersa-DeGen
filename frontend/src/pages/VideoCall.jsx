@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import './VideoCall.css';
 
 export default function VideoCall({ appointmentId, userRole, onEnd }) {
@@ -10,6 +11,12 @@ export default function VideoCall({ appointmentId, userRole, onEnd }) {
   const [callStatus, setCallStatus] = useState('initializing'); // initializing, connecting, connected, ended
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
+
+  // --- New states and refs for Deepgram ---
+  const [transcriptSnippets, setTranscriptSnippets] = useState([]);
+  const [transcriptDisplay, setTranscriptDisplay] = useState('');
+  const mediaRecorderRef = useRef(null);
+  const deepgramConnectionRef = useRef(null);
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -39,6 +46,66 @@ export default function VideoCall({ appointmentId, userRole, onEnd }) {
     };
   }, [appointmentId]);
 
+  const initializeDeepgram = async (stream) => {
+    try {
+      // 1. Get the temporary token from your Edge Function
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke(
+        'get-deepgram-token'
+      );
+      if (tokenError) throw tokenError;
+
+      // 2. Create Deepgram client with the token
+      const deepgramClient = createClient(tokenData.access_token);
+      const connection = deepgramClient.listen.live({
+        model: 'nova-2',
+        language: 'en',
+        smart_format: true,
+        interim_results: true,
+      });
+
+      deepgramConnectionRef.current = connection;
+
+      // 3. Listen for transcript events
+      connection.on(LiveTranscriptionEvents.Open, () => {
+        console.log('Deepgram connection opened');
+      });
+
+      connection.on(LiveTranscriptionEvents.Transcript, (data) => {
+        const transcript = data.channel.alternatives[0].transcript;
+        if (transcript) {
+          if (data.is_final) {
+            setTranscriptSnippets((prev) => [...prev, transcript]);
+            setTranscriptDisplay('');
+          } else {
+            setTranscriptDisplay(transcript);
+          }
+        }
+      });
+
+      connection.on(LiveTranscriptionEvents.Close, () => {
+        console.log('Deepgram connection closed');
+      });
+
+      // 4. Create a MediaRecorder to send audio
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm',
+      });
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0 && connection.getReadyState() === 1) {
+          connection.send(event.data);
+        }
+      };
+      
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start(250);
+
+    } catch (err) {
+      console.error('Error initializing Deepgram:', err);
+      toast.error('Could not start live transcription.');
+    }
+  };
+
   const initializeCall = async () => {
     try {
       // Get local media stream
@@ -46,7 +113,6 @@ export default function VideoCall({ appointmentId, userRole, onEnd }) {
         video: true,
         audio: true
       });
-      
       setLocalStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
@@ -182,10 +248,11 @@ export default function VideoCall({ appointmentId, userRole, onEnd }) {
   };
 
   const endCall = () => {
+    const fullTranscript = transcriptSnippets.join(' ');
     cleanup();
     setCallStatus('ended');
     toast.success('Call ended');
-    if (onEnd) onEnd();
+    if (onEnd) onEnd(fullTranscript);
   };
 
   const cleanup = () => {
@@ -194,6 +261,14 @@ export default function VideoCall({ appointmentId, userRole, onEnd }) {
     }
     if (peerConnection) {
       peerConnection.close();
+    }
+    
+    // Cleanup Deepgram resources
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+    }
+    if (deepgramConnectionRef.current) {
+      deepgramConnectionRef.current.finish();
     }
     setLocalStream(null);
     setRemoteStream(null);
@@ -251,6 +326,13 @@ export default function VideoCall({ appointmentId, userRole, onEnd }) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="live-transcript-overlay">
+        <p>
+          {transcriptSnippets.slice(-2).join(' ')}
+          <span style={{ color: '#ccc' }}>{transcriptDisplay}</span>
+        </p>
       </div>
 
       <div className="video-controls">

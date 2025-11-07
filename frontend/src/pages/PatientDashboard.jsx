@@ -717,9 +717,19 @@ export default function PatientDashboard() {
       <VideoCall
         appointmentId={activeCall.id}
         userRole="patient"
-        onEnd={() => {
+        onEnd={async (fullTranscript) => {
+          const callId = activeCall.id;
           setActiveCall(null);
           fetchAppointments();
+
+          if (fullTranscript && fullTranscript.trim().length > 0) {
+            try {
+              // We only have the doctor trigger the summary to avoid duplicates
+              console.log('Call ended.');
+            } catch (err) {
+              toast.error(`Error on call end: ${err.message}`);
+            }
+          }
         }}
       />
     );

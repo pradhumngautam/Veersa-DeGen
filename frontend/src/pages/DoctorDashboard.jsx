@@ -383,9 +383,27 @@ export default function DoctorDashboard() {
       <VideoCall
         appointmentId={activeCall.id}
         userRole="doctor"
-        onEnd={() => {
+        onEnd={async (fullTranscript) => {
+          const callId = activeCall.id;
           setActiveCall(null);
           fetchAppointments();
+
+          if (fullTranscript && fullTranscript.trim().length > 0) {
+            try {
+              toast.loading('Generating call summary...');
+              await supabase.functions.invoke('summarize-call', {
+                body: { 
+                  appointmentId: callId,
+                  fullTranscript: fullTranscript
+                }
+              });
+              toast.dismiss();
+              toast.success('Call summary saved!');
+            } catch (err) {
+              toast.dismiss();
+              toast.error(`Could not save summary: ${err.message}`);
+            }
+          }
         }}
       />
     );
