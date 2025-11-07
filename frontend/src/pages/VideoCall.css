@@ -1,0 +1,196 @@
+.video-call-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #1a1a1a;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+}
+
+.video-call-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+}
+
+.video-call-header h3 {
+  margin: 0;
+  color: white;
+}
+
+.call-status {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-initializing,
+.status-connecting {
+  background: #ffc107;
+  color: #000;
+}
+
+.status-connected {
+  background: #28a745;
+  color: white;
+}
+
+.video-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  padding: 20px;
+  position: relative;
+}
+
+.video-container {
+  position: relative;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.remote-video {
+  grid-column: 1;
+  grid-row: 1;
+  height: 100%;
+}
+
+.local-video {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  width: 250px;
+  height: 180px;
+  border: 3px solid #667eea;
+  z-index: 10;
+}
+
+.video-element {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.waiting-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 18px;
+  text-align: center;
+}
+
+.video-off-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+}
+
+.video-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 30px;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.control-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  background: #333;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.control-btn:hover {
+  background: #444;
+  transform: scale(1.1);
+}
+
+.control-btn.active {
+  background: #667eea;
+}
+
+.end-call-btn {
+  background: #dc3545;
+  width: auto;
+  padding: 0 24px;
+  border-radius: 30px;
+  font-size: 16px;
+}
+
+.end-call-btn:hover {
+  background: #c82333;
+}
+
+.video-call-ended {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.video-call-ended h3 {
+  color: white;
+  margin-bottom: 30px;
+  font-size: 32px;
+}
+
+@media (max-width: 768px) {
+  .local-video {
+    width: 150px;
+    height: 110px;
+    bottom: 100px;
+    right: 20px;
+  }
+
+  .video-controls {
+    padding: 20px;
+    gap: 15px;
+  }
+
+  .control-btn {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .end-call-btn {
+    padding: 0 20px;
+    font-size: 14px;
+  }
+}
