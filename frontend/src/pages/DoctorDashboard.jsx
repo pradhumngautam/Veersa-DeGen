@@ -392,7 +392,14 @@ export default function DoctorDashboard() {
   }
 
   if (loading) {
-    return <div className="dashboard-container">Loading...</div>;
+    return (
+      <div className="dashboard-container">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading your dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -495,6 +495,7 @@ export default function PatientDashboard() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("upcoming");
   const [activeCall, setActiveCall] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [bookingData, setBookingData] = useState({
     doctor_id: "",
@@ -503,6 +504,8 @@ export default function PatientDashboard() {
     specialty_needed: "",
     patient_notes: "",
   });
+  const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     if (!userProfile?.profile?.id) return;
@@ -569,19 +572,51 @@ export default function PatientDashboard() {
   };
 
   const fetchAvailableSlots = async (doctorId, date) => {
-    if (!doctorId || !date) return [];
+    if (!doctorId || !date) {
+      setAvailableTimeSlots([]);
+      return;
+    }
 
+    setLoadingSlots(true);
     try {
-      const { data, error } = await supabase.rpc("get_doctor_available_slots", {
-        p_doctor_id: doctorId,
-        p_appointment_date: date,
-      });
+      // Get doctor's profile with available slots
+      const { data: doctorData, error: doctorError } = await supabase
+        .from("doctor_profiles")
+        .select("available_slots")
+        .eq("id", doctorId)
+        .single();
 
-      if (error) throw error;
-      return data || [];
+      if (doctorError) throw doctorError;
+
+      // Get already booked appointments for this doctor on this date
+      const { data: bookedAppointments, error: appointmentsError } = await supabase
+        .from("appointments")
+        .select("appointment_time")
+        .eq("doctor_id", doctorId)
+        .eq("appointment_date", date)
+        .in("status", ["pending", "confirmed"]);
+
+      if (appointmentsError) throw appointmentsError;
+
+      // Get booked time slots
+      const bookedSlots = bookedAppointments?.map(apt => apt.appointment_time) || [];
+
+      // Filter available slots - only show slots that doctor has defined and are not booked
+      const doctorSlots = doctorData?.available_slots || [];
+      const availableSlots = doctorSlots.filter(slot => !bookedSlots.includes(slot));
+
+      setAvailableTimeSlots(availableSlots.sort());
+      
+      // Clear selected time if it's no longer available
+      if (bookingData.appointment_time && !availableSlots.includes(bookingData.appointment_time)) {
+        setBookingData((prev) => ({ ...prev, appointment_time: "" }));
+      }
     } catch (error) {
       console.error("Error fetching available slots:", error);
-      return [];
+      toast.error("Failed to load available slots");
+      setAvailableTimeSlots([]);
+    } finally {
+      setLoadingSlots(false);
     }
   };
 
@@ -595,6 +630,8 @@ export default function PatientDashboard() {
 
       if (doctorId && date) {
         await fetchAvailableSlots(doctorId, date);
+      } else {
+        setAvailableTimeSlots([]);
       }
     }
   };
@@ -658,6 +695,7 @@ export default function PatientDashboard() {
         specialty_needed: "",
         patient_notes: "",
       });
+      setAvailableTimeSlots([]);
       fetchAppointments();
     } catch (error) {
       console.error("Error booking appointment:", error);
@@ -726,7 +764,14 @@ export default function PatientDashboard() {
   }
 
   if (loading && appointments.length === 0) {
-    return <div className="dashboard-container">Loading...</div>;
+    return (
+      <div className="dashboard-container">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading your dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -756,28 +801,64 @@ export default function PatientDashboard() {
       </div>
 
       {showBooking && (
-        <div className="booking-modal">
+        <div className="booking-modal" onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowBooking(false);
+            setAvailableTimeSlots([]);
+            setSearchQuery("");
+          }
+        }}>
           <div className="booking-card">
             <h2>Book Appointment</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setShowBooking(false);
+                setAvailableTimeSlots([]);
+                setSearchQuery("");
+              }}
+              className="close-modal-btn"
+              aria-label="Close"
+            >
+              ×
+            </button>
             <form onSubmit={handleBookAppointment}>
               <div className="form-group">
                 <label>Select Doctor *</label>
-                <select
-                  value={bookingData.doctor_id}
-                  onChange={(e) =>
-                    handleBookingChange("doctor_id", e.target.value)
-                  }
-                  required
-                >
-                  <option value="">Choose a doctor</option>
-                  {doctors.map((doctor) => (
-                    <option key={doctor.id} value={doctor.id}>
-                      Dr. {doctor.first_name} {doctor.last_name} -{" "}
-                      {doctor.specialization?.join(", ")} - $
-                      {doctor.consultation_price}
-                    </option>
-                  ))}
-                </select>
+                <div className="doctor-select-wrapper">
+                  <input
+                    type="text"
+                    placeholder="Search doctors..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="doctor-search-input"
+                  />
+                  <select
+                    value={bookingData.doctor_id}
+                    onChange={(e) =>
+                      handleBookingChange("doctor_id", e.target.value)
+                    }
+                    required
+                    className="doctor-select"
+                  >
+                    <option value="">Choose a doctor</option>
+                    {doctors
+                      .filter((doctor) => {
+                        if (!searchQuery) return true;
+                        const searchLower = searchQuery.toLowerCase();
+                        const fullName = `${doctor.first_name} ${doctor.last_name}`.toLowerCase();
+                        const specialization = doctor.specialization?.join(", ").toLowerCase() || "";
+                        return fullName.includes(searchLower) || specialization.includes(searchLower);
+                      })
+                      .map((doctor) => (
+                        <option key={doctor.id} value={doctor.id}>
+                          Dr. {doctor.first_name} {doctor.last_name} -{" "}
+                          {doctor.specialization?.join(", ")} - $
+                          {doctor.consultation_price}
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
 
               <div className="form-group">
@@ -807,14 +888,40 @@ export default function PatientDashboard() {
 
               <div className="form-group">
                 <label>Appointment Time *</label>
-                <input
-                  type="time"
-                  value={bookingData.appointment_time}
-                  onChange={(e) =>
-                    handleBookingChange("appointment_time", e.target.value)
-                  }
-                  required
-                />
+                {availableTimeSlots.length === 0 && bookingData.doctor_id && bookingData.appointment_date ? (
+                  <div className="slots-message">
+                    {loadingSlots ? (
+                      <span className="loading-text">Loading available slots...</span>
+                    ) : (
+                      <span className="no-slots-text">
+                        No available slots for this doctor on the selected date. Please choose another date.
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <select
+                    value={bookingData.appointment_time}
+                    onChange={(e) =>
+                      handleBookingChange("appointment_time", e.target.value)
+                    }
+                    required
+                    disabled={!bookingData.doctor_id || !bookingData.appointment_date || loadingSlots}
+                    className="time-select"
+                  >
+                    <option value="">
+                      {!bookingData.doctor_id || !bookingData.appointment_date
+                        ? "Select doctor and date first"
+                        : loadingSlots
+                        ? "Loading slots..."
+                        : "Choose a time slot"}
+                    </option>
+                    {availableTimeSlots.map((slot) => (
+                      <option key={slot} value={slot}>
+                        {slot}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="form-group">
